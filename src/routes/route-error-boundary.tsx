@@ -1,5 +1,6 @@
 import { Link, isRouteErrorResponse, useRouteError } from 'react-router'
-import { isApiError } from '@/lib/api-error'
+import { isApiError } from '@/api/api-error'
+import { ROUTES } from '@/constants/routes'
 
 
 export default function RouteErrorBoundary() {
@@ -26,7 +27,7 @@ export default function RouteErrorBoundary() {
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="text-slate-600 max-w-prose">{message}</p>
       <Link
-        to="/"
+        to={ROUTES.home}
         className="mt-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white"
       >
         Về trang chủ

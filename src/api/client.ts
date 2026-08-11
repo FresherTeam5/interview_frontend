@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
-import { normalizeError } from '@/lib/api-error'
-import { tokenStorage } from '@/lib/token-storage'
+import { normalizeError } from '@/api/api-error'
+import { tokenStorage } from '@/api/token-storage'
 import type { AuthTokens } from '@/types/api'
 
 declare module 'axios' {
