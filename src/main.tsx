@@ -5,12 +5,15 @@ import { ThemeProvider } from 'next-themes'
 import './index.css'
 import { router } from '@/routes'
 import { Toaster } from '@/components/ui/sonner'
+import { QueryProvider } from '@/contexts/query-client'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <RouterProvider router={router} />
-      <Toaster />
-    </ThemeProvider>
+    <QueryProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <RouterProvider router={router} />
+        <Toaster />
+      </ThemeProvider>
+    </QueryProvider>
   </StrictMode>,
 )
