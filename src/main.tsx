@@ -6,13 +6,16 @@ import './index.css'
 import { router } from '@/routes'
 import { Toaster } from '@/components/ui/sonner'
 import { QueryProvider } from '@/contexts/query-client'
+import { AuthProvider } from '@/contexts/auth-context'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryProvider>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-        <RouterProvider router={router} />
-        <Toaster />
+        <AuthProvider>
+          <RouterProvider router={router} />
+          <Toaster />
+        </AuthProvider>
       </ThemeProvider>
     </QueryProvider>
   </StrictMode>,

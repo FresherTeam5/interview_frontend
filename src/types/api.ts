@@ -18,6 +18,3 @@ export interface Paginated<T> {
   total: number
 }
 
-export interface AuthTokens {
-  accessToken: string
-}

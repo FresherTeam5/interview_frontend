@@ -1,11 +1,11 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import { normalizeError } from '@/api/api-error'
 import { tokenStorage } from '@/api/token-storage'
-import type { AuthTokens } from '@/types/api'
+import type { AuthTokens } from '@/types/auth'
 
 declare module 'axios' {
-  interface InternalAxiosRequestConfig {
-    _retry?: boolean
+  interface AxiosRequestConfig {
+     _retry?: boolean
     skipAuth?: boolean
   }
 }
