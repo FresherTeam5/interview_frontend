@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { SignupForm } from '@/components/signup-form'
-import type { SignupFieldErrors } from '@/components/signup-form'
+import { SignupForm } from '@/features/auth/components/signup-form'
+import type { SignupFieldErrors } from '@/features/auth/components/signup-form'
 import { useAuth } from '@/hooks/use-auth'
 import { isApiError } from '@/api/api-error'
 import { ROUTES } from '@/constants/routes'
+import {
+  validateFullName,
+  validateEmail,
+  validatePassword,
+  validateConfirmPassword,
+} from '@/lib/validation'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -18,24 +24,21 @@ export default function RegisterPage() {
   function validate(formData: FormData): boolean {
     const errors: SignupFieldErrors = {}
     const fullName = (formData.get('fullName') as string) ?? ''
+    const email = (formData.get('email') as string) ?? ''
     const password = (formData.get('password') as string) ?? ''
     const confirmPassword = (formData.get('confirmPassword') as string) ?? ''
 
-    if (!fullName.trim()) {
-      errors.fullName = 'Họ tên là bắt buộc'
-    } else if (fullName.trim().length > 150) {
-      errors.fullName = 'Họ tên tối đa 150 ký tự'
-    }
+    const fullNameErr = validateFullName(fullName)
+    if (fullNameErr) errors.fullName = fullNameErr
 
-    if (!password) {
-      errors.password = 'Mật khẩu là bắt buộc'
-    } else if (password.length < 6) {
-      errors.password = 'Mật khẩu tối thiểu 6 ký tự'
-    }
+    const emailErr = validateEmail(email)
+    if (emailErr) errors.email = emailErr
 
-    if (password && confirmPassword !== password) {
-      errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
-    }
+    const passwordErr = validatePassword(password)
+    if (passwordErr) errors.password = passwordErr
+
+    const confirmErr = validateConfirmPassword(password, confirmPassword)
+    if (confirmErr) errors.confirmPassword = confirmErr
 
     setFieldErrors(errors)
     return Object.keys(errors).length === 0

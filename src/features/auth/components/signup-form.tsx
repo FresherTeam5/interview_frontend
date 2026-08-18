@@ -165,7 +165,7 @@ export function SignupForm({
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Tạo tài khoản
               </Button>
-              <Button variant="outline" type="button" className="w-full">
+              <Button variant="outline" type="button" className="w-full" disabled title="Tính năng sắp ra mắt">
                 Đăng ký với Google
               </Button>
               <FieldDescription className="px-6 text-center">

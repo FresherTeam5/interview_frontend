@@ -23,12 +23,12 @@ export default function RouteErrorBoundary() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-4 text-center">
-      {status ? <p className="text-sm font-mono text-slate-500">HTTP {status}</p> : null}
+      {status ? <p className="text-sm font-mono text-muted-foreground">HTTP {status}</p> : null}
       <h1 className="text-2xl font-semibold">{title}</h1>
-      <p className="text-slate-600 max-w-prose">{message}</p>
+      <p className="text-muted-foreground max-w-prose">{message}</p>
       <Link
         to={ROUTES.home}
-        className="mt-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white"
+        className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
       >
         Về trang chủ
       </Link>

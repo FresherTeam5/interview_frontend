@@ -19,10 +19,17 @@ import {
 import { Input } from "@/components/ui/input"
 import { ROUTES } from '@/constants/routes'
 
+export interface LoginFieldErrors {
+  email?: string
+  password?: string
+}
+
 interface LoginFormProps extends React.ComponentProps<"div"> {
   onSubmitForm?: (e: React.FormEvent<HTMLFormElement>) => void
   isLoading?: boolean
   error?: string
+  fieldErrors?: LoginFieldErrors
+  onFieldChange?: (field: keyof LoginFieldErrors) => void
 }
 
 export function LoginForm({
@@ -30,6 +37,8 @@ export function LoginForm({
   onSubmitForm,
   isLoading = false,
   error,
+  fieldErrors = {},
+  onFieldChange,
   ...props
 }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
@@ -60,17 +69,22 @@ export function LoginForm({
                   placeholder="m@example.com"
                   required
                   disabled={isLoading}
+                  aria-invalid={!!fieldErrors.email}
+                  onChange={() => onFieldChange?.('email')}
                 />
+                {fieldErrors.email && (
+                  <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                )}
               </Field>
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Mật khẩu</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                  <span
+                    className="ml-auto inline-block text-sm text-muted-foreground/50 cursor-not-allowed"
+                    title="Tính năng sắp ra mắt"
                   >
                     Quên mật khẩu?
-                  </a>
+                  </span>
                 </div>
                 <div className="relative">
                   <Input
@@ -80,6 +94,8 @@ export function LoginForm({
                     required
                     disabled={isLoading}
                     className="pr-10"
+                    aria-invalid={!!fieldErrors.password}
+                    onChange={() => onFieldChange?.('password')}
                   />
                   <button
                     type="button"
@@ -91,13 +107,16 @@ export function LoginForm({
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="text-sm text-destructive">{fieldErrors.password}</p>
+                )}
               </Field>
               <Field>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Đăng nhập
                 </Button>
-                <Button variant="outline" type="button" className="w-full">
+                <Button variant="outline" type="button" className="w-full" disabled title="Tính năng sắp ra mắt">
                   Đăng nhập với Google
                 </Button>
                 <FieldDescription className="text-center">

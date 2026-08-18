@@ -4,6 +4,7 @@ import { LogOut, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import ModeToggle from '@/components/mode-toggle'
 import { useAuth } from '@/hooks/use-auth'
+import { ROLES } from '@/constants/roles'
 import { ROUTES } from '@/constants/routes'
 import { useState } from 'react'
 
@@ -32,7 +33,7 @@ export default function Header() {
 
   return (
     <header className="border-b">
-      <nav className="mx-auto max-w-5xl flex items-center gap-6 px-4 h-14">
+      <nav className="mx-auto max-w-7xl flex items-center gap-6 px-4 h-14">
         <Link to={ROUTES.home} className="font-semibold">
           MockInterview
         </Link>
@@ -52,6 +53,20 @@ export default function Header() {
               </NavLink>
             </li>
           ))}
+          {user?.role === ROLES.EVENT_ADMIN && (
+            <li>
+              <NavLink
+                to={ROUTES.adminQuestions}
+                className={({ isActive }) =>
+                  isActive
+                    ? 'text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground'
+                }
+              >
+                Quản trị
+              </NavLink>
+            </li>
+          )}
         </ul>
         <div className="ml-auto flex items-center gap-2">
           {isAuthenticated ? (

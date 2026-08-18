@@ -1,4 +1,4 @@
-import type { AuthTokens } from '@/types/api'
+import type { AuthTokens } from '@/types/auth'
 import { STORAGE_KEYS } from '@/constants/storage-keys'
 
 export const tokenStorage = {
