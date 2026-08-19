@@ -2,12 +2,15 @@ import { createBrowserRouter } from 'react-router'
 import RootLayout from '@/routes/root-layout'
 import AuthLayout from '@/routes/auth-layout'
 import GuestGuard from '@/routes/guest-guard'
+import AdminGuard from '@/routes/admin-guard'
 import RouteErrorBoundary from '@/routes/route-error-boundary'
 import HomePage from '@/pages/home-page'
 import AboutPage from '@/pages/about-page'
 import LoginPage from '@/pages/login-page'
 import RegisterPage from '@/pages/register-page'
 import NotFoundPage from '@/pages/not-found-page'
+import QuestionListPage from '@/pages/admin/question-list-page'
+import { ROUTES } from '@/constants/routes'
 
 export const router = createBrowserRouter([
   // Auth routes — layout riêng, không header/footer
@@ -17,15 +20,29 @@ export const router = createBrowserRouter([
       {
         element: <AuthLayout />,
         children: [
-          { path: '/login', element: <LoginPage /> },
-          { path: '/register', element: <RegisterPage /> },
+          { path: ROUTES.login, element: <LoginPage /> },
+          { path: ROUTES.register, element: <RegisterPage /> },
+        ],
+      },
+    ],
+  },
+  // Admin routes — cần quyền EVENT_ADMIN
+  {
+    element: <AdminGuard />,
+    children: [
+      {
+        path: '/admin',
+        element: <RootLayout />,
+        errorElement: <RouteErrorBoundary />,
+        children: [
+          { path: 'questions', element: <QuestionListPage /> },
         ],
       },
     ],
   },
   // App routes — giữ nguyên RootLayout
   {
-    path: '/',
+    path: ROUTES.home,
     element: <RootLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [

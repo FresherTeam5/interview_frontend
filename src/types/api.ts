@@ -2,19 +2,21 @@ export interface ApiError {
   status: number
   code: string
   message: string
-  fieldErrors?: Record<string, string[]>
+  fieldErrors?: Record<string, string>
 }
 
 export interface ApiErrorResponse {
   code?: string
   message?: string
-  errors?: Record<string, string[]>
+  fieldErrors?: Record<string, string>
 }
 
-export interface Paginated<T> {
-  items: T[]
+export interface PageResponse<T> {
+  content: T[]
   page: number
-  pageSize: number
-  total: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
 }
-

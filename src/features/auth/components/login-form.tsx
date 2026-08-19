@@ -13,6 +13,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
@@ -27,16 +28,25 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { ROUTES } from '@/constants/routes'
 
+export interface LoginFieldErrors {
+  email?: string
+  password?: string
+}
+
 interface LoginFormProps extends React.ComponentProps<typeof Card> {
   onSubmitForm?: (e: React.FormEvent<HTMLFormElement>) => void
   isLoading?: boolean
   error?: string
+  fieldErrors?: LoginFieldErrors
+  onFieldChange?: (field: keyof LoginFieldErrors) => void
 }
 
 export function LoginForm({
   onSubmitForm,
   isLoading = false,
   error,
+  fieldErrors = {},
+  onFieldChange,
   ...props
 }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
@@ -57,7 +67,7 @@ export function LoginForm({
             </Alert>
           )}
           <FieldGroup>
-            <Field>
+            <Field data-invalid={!!fieldErrors.email}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
@@ -67,9 +77,12 @@ export function LoginForm({
                 autoComplete="email"
                 required
                 disabled={isLoading}
+                aria-invalid={!!fieldErrors.email}
+                onChange={() => onFieldChange?.('email')}
               />
+              <FieldError>{fieldErrors.email}</FieldError>
             </Field>
-            <Field>
+            <Field data-invalid={!!fieldErrors.password}>
               <div className="flex items-center">
                 <FieldLabel htmlFor="password">Mật khẩu</FieldLabel>
                 <a
@@ -87,6 +100,8 @@ export function LoginForm({
                   autoComplete="current-password"
                   required
                   disabled={isLoading}
+                  aria-invalid={!!fieldErrors.password}
+                  onChange={() => onFieldChange?.('password')}
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
@@ -99,6 +114,7 @@ export function LoginForm({
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
+              <FieldError>{fieldErrors.password}</FieldError>
             </Field>
             <Field>
               <Button type="submit" className="w-full" disabled={isLoading}>

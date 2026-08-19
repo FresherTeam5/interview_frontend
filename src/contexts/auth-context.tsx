@@ -4,13 +4,13 @@ import { loginUser, logoutUser, registerUser } from '@/api/auth'
 import { tokenStorage } from '@/api/token-storage'
 import { AUTH_EXPIRED_EVENT } from '@/api/client'
 import { AuthContext } from '@/contexts/auth-context-def'
+import { STORAGE_KEYS } from '@/constants/storage-keys'
 import type { AuthUser, LoginRequest, RegisterRequest } from '@/types/auth'
 
-const USER_STORAGE_KEY = 'auth.user'
 
 function loadStoredUser(): AuthUser | null {
   try {
-    const raw = localStorage.getItem(USER_STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEYS.user)
     if (!raw) return null
     return JSON.parse(raw) as AuthUser
   } catch {
@@ -19,11 +19,11 @@ function loadStoredUser(): AuthUser | null {
 }
 
 function storeUser(user: AuthUser) {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user))
 }
 
 function clearStoredUser() {
-  localStorage.removeItem(USER_STORAGE_KEY)
+  localStorage.removeItem(STORAGE_KEYS.user)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

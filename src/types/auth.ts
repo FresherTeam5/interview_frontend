@@ -1,8 +1,9 @@
+import type { UserRole } from '@/constants/roles'
 
 export interface AuthUser {
   userId: number
   email: string
-  role: string
+  role: UserRole
 }
 
 export interface AuthContextValue {
@@ -32,5 +33,5 @@ export interface AuthResponse {
   accessToken: string
   userId: number
   email: string
-  role: 'EVENT_ADMIN' | 'PARTICIPANT'
+  role: UserRole
 }

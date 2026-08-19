@@ -30,7 +30,7 @@ export function normalizeError(error: unknown): ApiError {
     status,
     code: body.code ?? `HTTP_${status}`,
     message: body.message ?? defaultMessageFor(status),
-    fieldErrors: body.errors,
+    fieldErrors: body.fieldErrors,
   }
 }
 
