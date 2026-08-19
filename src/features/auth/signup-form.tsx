@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -12,10 +13,19 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
+  FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import { Spinner } from "@/components/ui/spinner"
 import { ROUTES } from '@/constants/routes'
 
 export interface SignupFieldErrors {
@@ -55,13 +65,13 @@ export function SignupForm({
       <CardContent>
         <form onSubmit={onSubmitForm}>
           {error && (
-            <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
           <FieldGroup>
             {/* Full Name */}
-            <Field>
+            <Field data-invalid={!!fieldErrors.fullName}>
               <FieldLabel htmlFor="name">Họ và tên</FieldLabel>
               <Input
                 id="name"
@@ -74,13 +84,11 @@ export function SignupForm({
                 aria-invalid={!!fieldErrors.fullName}
                 onChange={() => onFieldChange?.('fullName')}
               />
-              {fieldErrors.fullName && (
-                <p className="text-sm text-destructive">{fieldErrors.fullName}</p>
-              )}
+              <FieldError>{fieldErrors.fullName}</FieldError>
             </Field>
 
             {/* Email */}
-            <Field>
+            <Field data-invalid={!!fieldErrors.email}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
@@ -93,82 +101,79 @@ export function SignupForm({
                 aria-invalid={!!fieldErrors.email}
                 onChange={() => onFieldChange?.('email')}
               />
-              {fieldErrors.email && (
-                <p className="text-sm text-destructive">{fieldErrors.email}</p>
-              )}
+              <FieldError>{fieldErrors.email}</FieldError>
             </Field>
 
             {/* Password */}
-            <Field>
+            <Field data-invalid={!!fieldErrors.password}>
               <FieldLabel htmlFor="password">Mật khẩu</FieldLabel>
-              <div className="relative">
-                <Input
+              <InputGroup>
+                <InputGroupInput
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   required
                   disabled={isLoading}
-                  className="pr-10"
                   aria-invalid={!!fieldErrors.password}
                   onChange={() => onFieldChange?.('password')}
                 />
-                <button
-                  type="button"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    size="icon-xs"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? <EyeOff /> : <Eye />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
               <FieldDescription>Tối thiểu 6 ký tự.</FieldDescription>
-              {fieldErrors.password && (
-                <p className="text-sm text-destructive">{fieldErrors.password}</p>
-              )}
+              <FieldError>{fieldErrors.password}</FieldError>
             </Field>
 
             {/* Confirm Password */}
-            <Field>
+            <Field data-invalid={!!fieldErrors.confirmPassword}>
               <FieldLabel htmlFor="confirm-password">Xác nhận mật khẩu</FieldLabel>
-              <div className="relative">
-                <Input
+              <InputGroup>
+                <InputGroupInput
                   id="confirm-password"
                   name="confirmPassword"
                   type={showConfirm ? 'text' : 'password'}
                   autoComplete="new-password"
                   required
                   disabled={isLoading}
-                  className="pr-10"
                   aria-invalid={!!fieldErrors.confirmPassword}
                   onChange={() => onFieldChange?.('confirmPassword')}
                 />
-                <button
-                  type="button"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  tabIndex={-1}
-                  aria-label={showConfirm ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {fieldErrors.confirmPassword && (
-                <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p>
-              )}
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    size="icon-xs"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    tabIndex={-1}
+                    aria-label={showConfirm ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showConfirm ? <EyeOff /> : <Eye />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
+              <FieldError>{fieldErrors.confirmPassword}</FieldError>
             </Field>
 
             {/* Actions */}
             <Field>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading && <Spinner />}
                 Tạo tài khoản
               </Button>
+            </Field>
+            <FieldSeparator>Hoặc tiếp tục với</FieldSeparator>
+            <Field>
               <Button variant="outline" type="button" className="w-full">
                 Đăng ký với Google
               </Button>
-              <FieldDescription className="px-6 text-center">
+              <FieldDescription className="text-center">
                 Đã có tài khoản?{' '}
                 <Link
                   to={ROUTES.login}

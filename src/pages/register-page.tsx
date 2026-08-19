@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { SignupForm } from '@/components/signup-form'
-import type { SignupFieldErrors } from '@/components/signup-form'
+import { SignupForm } from '@/features/auth/signup-form'
+import type { SignupFieldErrors } from '@/features/auth/signup-form'
 import { useAuth } from '@/hooks/use-auth'
 import { isApiError } from '@/api/api-error'
 import { ROUTES } from '@/constants/routes'
@@ -75,16 +75,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <SignupForm
-          onSubmitForm={handleSubmit}
-          isLoading={isLoading}
-          error={error}
-          fieldErrors={fieldErrors}
-          onFieldChange={handleFieldChange}
-        />
-      </div>
-    </div>
+    <SignupForm
+      onSubmitForm={handleSubmit}
+      isLoading={isLoading}
+      error={error}
+      fieldErrors={fieldErrors}
+      onFieldChange={handleFieldChange}
+    />
   )
 }

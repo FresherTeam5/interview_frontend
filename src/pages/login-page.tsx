@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { LoginForm } from '@/components/login-form'
+import { LoginForm } from '@/features/auth/login-form'
 import { useAuth } from '@/hooks/use-auth'
 import { isApiError } from '@/api/api-error'
 import { ROUTES } from '@/constants/routes'
@@ -38,14 +38,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <LoginForm
-          onSubmitForm={handleSubmit}
-          isLoading={isLoading}
-          error={error}
-        />
-      </div>
-    </div>
+    <LoginForm
+      onSubmitForm={handleSubmit}
+      isLoading={isLoading}
+      error={error}
+    />
   )
 }
