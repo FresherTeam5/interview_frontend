@@ -1,4 +1,4 @@
-import { Pencil, Power, PowerOff } from 'lucide-react'
+import { FileQuestion, Pencil, Power, PowerOff, SearchX, X } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -10,30 +10,46 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
 import QuestionStatusBadge from '@/features/question-bank/components/question-status-badge'
 import {
   LEVEL_LABELS,
   QUESTION_TYPE_LABELS,
   DIFFICULTY_LABELS,
 } from '@/constants/question'
-import type { Question } from '@/types/question'
+import type { Question, QuestionDifficulty } from '@/types/question'
 
 interface QuestionTableProps {
   questions: Question[]
   isLoading?: boolean
   hasActiveFilters?: boolean
+  /** Câu hỏi đang chờ đổi trạng thái, dùng để khóa thao tác trên đúng dòng đó. */
+  pendingId?: number | null
+  skeletonRows?: number
   onEdit: (question: Question) => void
   onDeactivate: (question: Question) => void
   onReactivate: (question: Question) => void
+  onClearFilters: () => void
+  onCreate: () => void
 }
 
-const DIFFICULTY_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const COLUMN_COUNT = 10
+
+const DIFFICULTY_VARIANT: Record<QuestionDifficulty, 'secondary' | 'default' | 'destructive'> = {
   EASY: 'secondary',
   MEDIUM: 'default',
   HARD: 'destructive',
@@ -49,18 +65,44 @@ function formatDate(iso: string): string {
   }).format(new Date(iso))
 }
 
-function SkeletonRows() {
-  return Array.from({ length: 5 }).map((_, i) => (
-    <TableRow key={i}>
-      <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+/** Hiển thị tối đa `limit` thẻ, phần còn lại gộp vào "+N" kèm tooltip liệt kê đủ. */
+function TagCell({ items, limit }: { items: { id: number; nameVi: string }[]; limit: number }) {
+  if (items.length === 0) {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  const visible = items.slice(0, limit)
+  const hidden = items.slice(limit)
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {visible.map((item) => (
+        <Badge key={item.id} variant="secondary" className="font-normal">
+          {item.nameVi}
+        </Badge>
+      ))}
+      {hidden.length > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className="cursor-default font-normal">
+              +{hidden.length}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>{hidden.map((item) => item.nameVi).join(', ')}</TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  )
+}
+
+function SkeletonRows({ rows }: { rows: number }) {
+  return Array.from({ length: rows }).map((_, index) => (
+    <TableRow key={index}>
+      {Array.from({ length: COLUMN_COUNT }).map((__, cell) => (
+        <TableCell key={cell}>
+          <Skeleton className="h-4 w-full min-w-8" />
+        </TableCell>
+      ))}
     </TableRow>
   ))
 }
@@ -69,18 +111,22 @@ export default function QuestionTable({
   questions,
   isLoading,
   hasActiveFilters,
+  pendingId,
+  skeletonRows = 5,
   onEdit,
   onDeactivate,
   onReactivate,
+  onClearFilters,
+  onCreate,
 }: QuestionTableProps) {
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-[60px]">ID</TableHead>
-              <TableHead className="min-w-[250px]">Nội dung</TableHead>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="w-14">ID</TableHead>
+              <TableHead className="min-w-64">Nội dung</TableHead>
               <TableHead>Tech Stack</TableHead>
               <TableHead>Công nghệ</TableHead>
               <TableHead>Cấp độ</TableHead>
@@ -88,145 +134,148 @@ export default function QuestionTable({
               <TableHead>Độ khó</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Cập nhật</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
+              <TableHead className="w-24 text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <SkeletonRows />
+              <SkeletonRows rows={skeletonRows} />
             ) : questions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
-                  {hasActiveFilters
-                    ? 'Không tìm thấy câu hỏi phù hợp với bộ lọc.'
-                    : 'Chưa có câu hỏi nào.'}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={COLUMN_COUNT} className="p-0">
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        {hasActiveFilters ? <SearchX /> : <FileQuestion />}
+                      </EmptyMedia>
+                      <EmptyTitle>
+                        {hasActiveFilters ? 'Không có kết quả' : 'Chưa có câu hỏi nào'}
+                      </EmptyTitle>
+                      <EmptyDescription>
+                        {hasActiveFilters
+                          ? 'Không tìm thấy câu hỏi phù hợp với bộ lọc hiện tại. Thử nới lỏng điều kiện lọc.'
+                          : 'Bắt đầu bằng cách thêm câu hỏi đầu tiên vào ngân hàng câu hỏi.'}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      {hasActiveFilters ? (
+                        <Button variant="outline" onClick={onClearFilters}>
+                          <X data-icon="inline-start" />
+                          Xóa bộ lọc
+                        </Button>
+                      ) : (
+                        <Button onClick={onCreate}>Thêm câu hỏi</Button>
+                      )}
+                    </EmptyContent>
+                  </Empty>
                 </TableCell>
               </TableRow>
             ) : (
-              questions.map((q) => (
-                <TableRow key={q.id} className={!q.active ? 'opacity-60' : undefined}>
-                  <TableCell className="font-mono text-muted-foreground">{q.id}</TableCell>
-                  <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="line-clamp-2 max-w-[300px] cursor-default text-sm">
-                          {q.contentVi}
-                        </p>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-sm">
-                        <p className="text-sm">{q.contentVi}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <div className="flex flex-wrap gap-1">
-                      {q.techStacks && q.techStacks.length > 0 ? (
-                        <>
-                          {q.techStacks.slice(0, 2).map((ts) => (
-                            <Badge key={ts.id} variant="secondary" className="whitespace-nowrap font-normal">
-                              {ts.nameVi}
-                            </Badge>
-                          ))}
-                          {q.techStacks.length > 2 && (
-                            <Badge variant="secondary" className="whitespace-nowrap font-normal">
-                              +{q.techStacks.length - 2}
-                            </Badge>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <div className="flex flex-wrap gap-1">
-                      {q.technologies && q.technologies.length > 0 ? (
-                        <>
-                          {q.technologies.slice(0, 3).map((tech) => (
-                            <Badge key={tech.id} variant="secondary" className="whitespace-nowrap font-normal">
-                              {tech.nameVi}
-                            </Badge>
-                          ))}
-                          {q.technologies.length > 3 && (
-                            <Badge variant="secondary" className="whitespace-nowrap font-normal">
-                              +{q.technologies.length - 3}
-                            </Badge>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{LEVEL_LABELS[q.level]}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{QUESTION_TYPE_LABELS[q.questionType]}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={DIFFICULTY_VARIANT[q.difficulty] ?? 'outline'}>
-                      {DIFFICULTY_LABELS[q.difficulty]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <QuestionStatusBadge active={q.active} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {formatDate(q.updatedAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+              questions.map((question) => {
+                const isPending = pendingId === question.id
+
+                return (
+                  <TableRow
+                    key={question.id}
+                    className={question.active ? undefined : 'opacity-60'}
+                  >
+                    <TableCell className="align-top font-mono text-muted-foreground">
+                      {question.id}
+                    </TableCell>
+                    <TableCell className="align-top">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => onEdit(q)}
-                            aria-label="Chỉnh sửa"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          <p className="line-clamp-2 max-w-80 cursor-default text-sm whitespace-normal">
+                            {question.contentVi}
+                          </p>
                         </TooltipTrigger>
-                        <TooltipContent>Chỉnh sửa</TooltipContent>
+                        <TooltipContent side="bottom" className="max-w-sm">
+                          {question.contentVi}
+                        </TooltipContent>
                       </Tooltip>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <TagCell items={question.techStacks ?? []} limit={2} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <TagCell items={question.technologies ?? []} limit={2} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant="outline">{LEVEL_LABELS[question.level]}</Badge>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant="outline">
+                        {QUESTION_TYPE_LABELS[question.questionType]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant={DIFFICULTY_VARIANT[question.difficulty]}>
+                        {DIFFICULTY_LABELS[question.difficulty]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <QuestionStatusBadge active={question.active} />
+                    </TableCell>
+                    <TableCell className="align-top text-sm text-muted-foreground">
+                      {formatDate(question.updatedAt)}
+                    </TableCell>
+                    <TableCell className="align-top text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={isPending}
+                              onClick={() => onEdit(question)}
+                              aria-label={`Chỉnh sửa câu hỏi ${question.id}`}
+                            >
+                              <Pencil />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Chỉnh sửa</TooltipContent>
+                        </Tooltip>
 
-                      {q.active ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => onDeactivate(q)}
-                              aria-label="Vô hiệu hóa"
+                              size="icon-sm"
+                              disabled={isPending}
+                              className={
+                                question.active
+                                  ? 'text-destructive hover:text-destructive'
+                                  : 'text-success hover:text-success'
+                              }
+                              onClick={() =>
+                                question.active
+                                  ? onDeactivate(question)
+                                  : onReactivate(question)
+                              }
+                              aria-label={
+                                question.active
+                                  ? `Vô hiệu hóa câu hỏi ${question.id}`
+                                  : `Kích hoạt lại câu hỏi ${question.id}`
+                              }
                             >
-                              <PowerOff className="h-4 w-4" />
+                              {isPending ? (
+                                <Spinner />
+                              ) : question.active ? (
+                                <PowerOff />
+                              ) : (
+                                <Power />
+                              )}
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Vô hiệu hóa</TooltipContent>
+                          <TooltipContent>
+                            {question.active ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                          </TooltipContent>
                         </Tooltip>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-success hover:text-success"
-                              onClick={() => onReactivate(q)}
-                              aria-label="Kích hoạt lại"
-                            >
-                              <Power className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Kích hoạt lại</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

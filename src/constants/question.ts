@@ -40,6 +40,9 @@ export const CREATE_QUESTION_DEFAULTS = {
 
 export const COMPANY_REF_MAX_LENGTH = 150
 
+/** Giới hạn backend áp cho cả techStackIds lẫn technologyIds. */
+export const MAX_TECH_SELECTION = 20
+
 export const ACTIVE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả' },
   { value: 'true', label: 'Đang hoạt động' },

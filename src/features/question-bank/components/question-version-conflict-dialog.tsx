@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -6,6 +7,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
@@ -21,20 +23,21 @@ export default function QuestionVersionConflictDialog({
   onCancel,
 }: QuestionVersionConflictDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={(v) => !v && onCancel()}>
+    <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
+          <AlertDialogMedia>
+            <RefreshCw />
+          </AlertDialogMedia>
           <AlertDialogTitle>Xung đột phiên bản</AlertDialogTitle>
           <AlertDialogDescription>
-            Câu hỏi đã được người khác cập nhật trong lúc bạn chỉnh sửa.
-            Vui lòng tải dữ liệu mới nhất và kiểm tra lại thay đổi.
+            Câu hỏi đã được người khác cập nhật trong lúc bạn chỉnh sửa. Tải lại dữ liệu
+            mới nhất rồi áp dụng lại thay đổi của bạn.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Hủy</AlertDialogCancel>
-          <AlertDialogAction onClick={onReload}>
-            Tải lại dữ liệu
-          </AlertDialogAction>
+          <AlertDialogCancel onClick={onCancel}>Để sau</AlertDialogCancel>
+          <AlertDialogAction onClick={onReload}>Tải lại dữ liệu</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

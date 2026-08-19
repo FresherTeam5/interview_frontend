@@ -1,21 +1,17 @@
-import { useState, useRef, useMemo } from 'react'
-import { Search, X, Filter } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { useEffect, useRef, useState } from 'react'
+import { FolderX, SearchIcon, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-} from '@/components/ui/dropdown-menu'
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group'
+import { Separator } from '@/components/ui/separator'
 import CommonSelect from '@/components/common-select'
+import MultiSelect from '@/components/multi-select'
+import { setArrayFilter, buildFilterChips, countActiveFilters } from '@/features/question-bank/filter-utils'
 import { useTechStacks } from '@/hooks/use-tech-stacks'
 import { useTechnologies } from '@/hooks/use-technologies'
 import {
@@ -28,87 +24,33 @@ import {
   ACTIVE_STATUS_OPTIONS,
   SEARCH_DEBOUNCE_MS,
 } from '@/constants/question'
-import type { QuestionFilter, QuestionLevel, QuestionType, QuestionDifficulty } from '@/types/question'
+import { TECHNOLOGY_TYPE_LABELS, TECHNOLOGY_TYPE_ORDER } from '@/constants/technology'
+import type { QuestionFilter } from '@/types/question'
 
 interface QuestionFilterBarProps {
   filter: QuestionFilter
   onChange: (filter: QuestionFilter) => void
 }
 
-function MultiSelectSubMenu({
-  title,
-  options,
-  selectedValues,
-  onChange,
-  searchable = false,
-}: {
-  title: string
-  options: { value: string; label: string }[]
-  selectedValues: string[]
-  onChange: (value: string, checked: boolean) => void
-  searchable?: boolean
-}) {
-  const [search, setSearch] = useState('')
-  
-  const filteredOptions = useMemo(() => {
-    if (!searchable || !search.trim()) return options
-    const lower = search.toLowerCase()
-    return options.filter(o => o.label.toLowerCase().includes(lower))
-  }, [options, search, searchable])
-
-  return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
-        {title}
-        {selectedValues.length > 0 && (
-          <Badge variant="secondary" className="ml-auto rounded-sm px-1 font-normal text-xs h-4 flex items-center justify-center">
-            {selectedValues.length}
-          </Badge>
-        )}
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="w-[220px]">
-        {searchable && (
-          <div className="p-2">
-            <Input 
-              placeholder="Tìm kiếm..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()} // Prevent closing on space
-              className="h-8"
-            />
-          </div>
-        )}
-        <div className="max-h-[300px] overflow-y-auto">
-          {filteredOptions.length === 0 ? (
-            <p className="p-2 text-sm text-muted-foreground text-center">Không tìm thấy.</p>
-          ) : (
-            filteredOptions.map((option) => (
-              <DropdownMenuCheckboxItem
-                key={option.value}
-                checked={selectedValues.includes(option.value)}
-                onCheckedChange={(checked) => onChange(option.value, checked)}
-                onSelect={(e) => e.preventDefault()} // Keep open on select
-              >
-                {option.label}
-              </DropdownMenuCheckboxItem>
-            ))
-          )}
-        </div>
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
-  )
-}
-
 export default function QuestionFilterBar({ filter, onChange }: QuestionFilterBarProps) {
-  const { data: techStacks = [] } = useTechStacks()
-  const { data: technologies = [] } = useTechnologies(true)
+  const { data: techStacks = [], isLoading: techStacksLoading } = useTechStacks()
+  const { data: technologies = [], isLoading: technologiesLoading } = useTechnologies(true)
 
   const [keyword, setKeyword] = useState(filter.keyword ?? '')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  function cancelPendingSearch() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+  }
+
+  useEffect(() => cancelPendingSearch, [])
+
   function handleKeywordChange(value: string) {
     setKeyword(value)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
+    cancelPendingSearch()
 
     debounceRef.current = setTimeout(() => {
       const trimmed = value.trim()
@@ -118,198 +60,171 @@ export default function QuestionFilterBar({ filter, onChange }: QuestionFilterBa
     }, SEARCH_DEBOUNCE_MS)
   }
 
-  function toggleArrayFilter<T extends string | number>(
-    key: 'techStackIds' | 'technologyIds' | 'levels' | 'questionTypes' | 'difficulties',
-    value: T,
-    checked: boolean
-  ) {
-    const current = (filter[key] as T[]) ?? []
-    let next: T[]
-    if (checked) {
-      next = [...current, value]
-    } else {
-      next = current.filter((v) => v !== value)
-    }
-    
-    onChange({
-      ...filter,
-      [key]: next.length > 0 ? next : undefined,
-      // If we are filtering by specific tech stacks, we shouldn't be searching for "unclassified"
-      ...(key === 'techStackIds' && next.length > 0 ? { unclassified: undefined } : {})
-    })
-  }
-
-  function handleUnclassifiedChange(checked: boolean) {
-    onChange({
-      ...filter,
-      unclassified: checked ? true : undefined,
-      techStackIds: checked ? undefined : filter.techStackIds,
-    })
+  function handleClearKeyword() {
+    cancelPendingSearch()
+    setKeyword('')
+    if (filter.keyword) onChange({ ...filter, keyword: undefined })
   }
 
   function handleActiveChange(value: string) {
-    const next = { ...filter }
-    if (value === 'all') {
-      delete next.active
-    } else {
-      next.active = value === 'true'
-    }
-    onChange(next)
+    onChange({ ...filter, active: value === 'all' ? undefined : value === 'true' })
+  }
+
+  function handleUnclassifiedToggle() {
+    const next = !filter.unclassified
+    onChange({
+      ...filter,
+      unclassified: next || undefined,
+      // Hai tiêu chí này loại trừ nhau: đã "chưa phân loại" thì không lọc theo stack cụ thể.
+      techStackIds: next ? undefined : filter.techStackIds,
+    })
   }
 
   function handleClearAll() {
+    cancelPendingSearch()
     setKeyword('')
     onChange({})
   }
 
-  const hasFilters =
-    !!filter.keyword ||
-    filter.active !== undefined ||
-    (filter.techStackIds && filter.techStackIds.length > 0) ||
-    filter.unclassified !== undefined ||
-    (filter.technologyIds && filter.technologyIds.length > 0) ||
-    (filter.levels && filter.levels.length > 0) ||
-    (filter.questionTypes && filter.questionTypes.length > 0) ||
-    (filter.difficulties && filter.difficulties.length > 0)
-
-  // Count active sub-filters
-  const activeFilterCount = 
-    (filter.techStackIds?.length ?? 0) +
-    (filter.unclassified ? 1 : 0) +
-    (filter.technologyIds?.length ?? 0) +
-    (filter.levels?.length ?? 0) +
-    (filter.questionTypes?.length ?? 0) +
-    (filter.difficulties?.length ?? 0)
+  const chips = buildFilterChips(filter, { techStacks, technologies })
+  const activeCount = countActiveFilters(filter)
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Keyword search */}
-        <div className="relative min-w-[220px] flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+    <div className="space-y-3 rounded-lg border bg-card p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <InputGroup className="min-w-56 max-w-sm flex-1">
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
             id="question-search"
-            placeholder="Tìm kiếm theo nội dung..."
+            placeholder="Tìm theo nội dung câu hỏi..."
             value={keyword}
             onChange={(e) => handleKeywordChange(e.target.value)}
-            className="pl-9 h-9"
           />
-        </div>
+          {keyword && (
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-xs"
+                aria-label="Xóa từ khóa"
+                onClick={handleClearKeyword}
+              >
+                <X />
+              </InputGroupButton>
+            </InputGroupAddon>
+          )}
+        </InputGroup>
 
-        {/* Active status */}
         <CommonSelect
           id="filter-status"
-          className="w-[150px] h-9"
+          className="h-9 w-[150px]"
           placeholder="Trạng thái"
           value={filter.active !== undefined ? String(filter.active) : 'all'}
           onValueChange={handleActiveChange}
           options={[...ACTIVE_STATUS_OPTIONS]}
         />
 
-        {/* Main Filter Dropdown */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="border-dashed h-9">
-              <Filter className="mr-2 h-4 w-4" />
-              Lọc dữ liệu
-              {activeFilterCount > 0 && (
-                <>
-                  <span className="mx-2 h-4 w-[1px] bg-border" />
-                  <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                    {activeFilterCount}
-                  </Badge>
-                </>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px]">
-            <DropdownMenuLabel>Thuộc tính câu hỏi</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+        <Separator orientation="vertical" className="mx-1 h-6 max-sm:hidden" />
 
-            {/* Tech Stack Sub-menu */}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                Tech Stack
-                {((filter.techStackIds?.length ?? 0) > 0 || filter.unclassified) && (
-                  <Badge variant="secondary" className="ml-auto rounded-sm px-1 font-normal text-xs h-4 flex items-center justify-center">
-                    {filter.unclassified ? '1' : filter.techStackIds?.length}
-                  </Badge>
-                )}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-[220px]">
-                <DropdownMenuCheckboxItem
-                  checked={!!filter.unclassified}
-                  onCheckedChange={handleUnclassifiedChange}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  Chưa phân loại
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Tech Stacks</DropdownMenuLabel>
-                <div className="max-h-[250px] overflow-y-auto">
-                  {techStacks.map((ts) => (
-                    <DropdownMenuCheckboxItem
-                      key={ts.id}
-                      checked={filter.techStackIds?.includes(ts.id) ?? false}
-                      onCheckedChange={(checked) => toggleArrayFilter('techStackIds', ts.id, checked)}
-                      onSelect={(e) => e.preventDefault()}
-                      disabled={filter.unclassified}
-                    >
-                      {ts.nameVi}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </div>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+        <MultiSelect
+          variant="facet"
+          label="Tech Stack"
+          disabled={filter.unclassified}
+          loading={techStacksLoading}
+          searchPlaceholder="Tìm tech stack..."
+          emptyText="Không có tech stack nào."
+          options={techStacks.map((item) => ({
+            value: item.id,
+            label: item.nameVi,
+            keywords: [item.code, item.nameEn],
+          }))}
+          value={filter.techStackIds ?? []}
+          onChange={(values) => onChange(setArrayFilter(filter, 'techStackIds', values))}
+        />
 
-            {/* Technology Sub-menu */}
-            <MultiSelectSubMenu
-              title="Công nghệ"
-              searchable
-              options={technologies.map(t => ({ value: String(t.id), label: t.nameVi }))}
-              selectedValues={filter.technologyIds?.map(String) ?? []}
-              onChange={(val, checked) => toggleArrayFilter('technologyIds', Number(val), checked)}
-            />
+        <MultiSelect
+          variant="facet"
+          label="Công nghệ"
+          loading={technologiesLoading}
+          searchPlaceholder="Tìm công nghệ..."
+          emptyText="Không có công nghệ nào."
+          groupOrder={TECHNOLOGY_TYPE_ORDER.map((type) => TECHNOLOGY_TYPE_LABELS[type])}
+          options={technologies.map((item) => ({
+            value: item.id,
+            label: item.nameVi,
+            group: TECHNOLOGY_TYPE_LABELS[item.type],
+            keywords: [item.code, item.nameEn],
+          }))}
+          value={filter.technologyIds ?? []}
+          onChange={(values) => onChange(setArrayFilter(filter, 'technologyIds', values))}
+        />
 
-            {/* Level Sub-menu */}
-            <MultiSelectSubMenu
-              title="Cấp độ"
-              options={QUESTION_LEVELS.map(l => ({ value: l, label: LEVEL_LABELS[l] }))}
-              selectedValues={filter.levels ?? []}
-              onChange={(val, checked) => toggleArrayFilter('levels', val as QuestionLevel, checked)}
-            />
+        <MultiSelect
+          variant="facet"
+          label="Cấp độ"
+          options={QUESTION_LEVELS.map((level) => ({ value: level, label: LEVEL_LABELS[level] }))}
+          value={filter.levels ?? []}
+          onChange={(values) => onChange(setArrayFilter(filter, 'levels', values))}
+        />
 
-            {/* Question Type Sub-menu */}
-            <MultiSelectSubMenu
-              title="Loại câu hỏi"
-              options={QUESTION_TYPES.map(t => ({ value: t, label: QUESTION_TYPE_LABELS[t] }))}
-              selectedValues={filter.questionTypes ?? []}
-              onChange={(val, checked) => toggleArrayFilter('questionTypes', val as QuestionType, checked)}
-            />
+        <MultiSelect
+          variant="facet"
+          label="Loại"
+          options={QUESTION_TYPES.map((type) => ({
+            value: type,
+            label: QUESTION_TYPE_LABELS[type],
+          }))}
+          value={filter.questionTypes ?? []}
+          onChange={(values) => onChange(setArrayFilter(filter, 'questionTypes', values))}
+        />
 
-            {/* Difficulty Sub-menu */}
-            <MultiSelectSubMenu
-              title="Độ khó"
-              options={QUESTION_DIFFICULTIES.map(d => ({ value: d, label: DIFFICULTY_LABELS[d] }))}
-              selectedValues={filter.difficulties ?? []}
-              onChange={(val, checked) => toggleArrayFilter('difficulties', val as QuestionDifficulty, checked)}
-            />
+        <MultiSelect
+          variant="facet"
+          label="Độ khó"
+          options={QUESTION_DIFFICULTIES.map((difficulty) => ({
+            value: difficulty,
+            label: DIFFICULTY_LABELS[difficulty],
+          }))}
+          value={filter.difficulties ?? []}
+          onChange={(values) => onChange(setArrayFilter(filter, 'difficulties', values))}
+        />
 
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant={filter.unclassified ? 'secondary' : 'outline'}
+          className={filter.unclassified ? undefined : 'border-dashed'}
+          aria-pressed={filter.unclassified ?? false}
+          onClick={handleUnclassifiedToggle}
+        >
+          <FolderX data-icon="inline-start" />
+          Chưa phân loại
+        </Button>
 
-        {/* Clear all */}
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            className="h-9 px-3 text-muted-foreground"
-            onClick={handleClearAll}
-          >
-            <X className="mr-2 h-4 w-4" />
-            Xóa lọc
+        {activeCount > 0 && (
+          <Button variant="ghost" className="ml-auto" onClick={handleClearAll}>
+            <X data-icon="inline-start" />
+            Xóa lọc ({activeCount})
           </Button>
         )}
       </div>
-    </TooltipProvider>
+
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t pt-3">
+          {chips.map((chip) => (
+            <Badge key={chip.key} variant="secondary" className="gap-1 pr-1 font-normal">
+              <span className="text-muted-foreground">{chip.group}:</span>
+              {chip.label}
+              <button
+                type="button"
+                aria-label={`Bỏ lọc ${chip.group}: ${chip.label}`}
+                className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                onClick={() => onChange(chip.next)}
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

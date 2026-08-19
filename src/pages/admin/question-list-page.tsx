@@ -1,13 +1,23 @@
-import { useState, useCallback } from 'react'
-import { Plus, RefreshCw, AlertCircle } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Plus, RefreshCw, ServerCrash } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import QuestionFilterBar from '@/features/question-bank/components/question-filter-bar'
 import QuestionTable from '@/features/question-bank/components/question-table'
 import QuestionPagination from '@/features/question-bank/components/question-pagination'
 import QuestionFormDialog from '@/features/question-bank/components/question-form-dialog'
 import QuestionDeleteDialog from '@/features/question-bank/components/question-delete-dialog'
 import QuestionVersionConflictDialog from '@/features/question-bank/components/question-version-conflict-dialog'
+import { hasActiveFilters } from '@/features/question-bank/filter-utils'
 import { useQuestions } from '@/hooks/use-questions'
 import { getQuestion } from '@/api/question'
 import {
@@ -15,9 +25,14 @@ import {
   useUpdateQuestion,
   useDeactivateQuestion,
 } from '@/hooks/use-question-mutations'
-import { normalizeError, isApiError } from '@/api/api-error'
+import { normalizeError } from '@/api/api-error'
 import { DEFAULT_PAGE_SIZE } from '@/constants/question'
-import type { Question, QuestionFilter, CreateQuestionPayload, UpdateQuestionPayload } from '@/types/question'
+import type {
+  Question,
+  QuestionFilter,
+  CreateQuestionPayload,
+  UpdateQuestionPayload,
+} from '@/types/question'
 
 type DialogState =
   | { type: 'closed' }
@@ -26,37 +41,40 @@ type DialogState =
   | { type: 'delete'; question: Question }
 
 export default function QuestionListPage() {
+  const queryClient = useQueryClient()
+
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(DEFAULT_PAGE_SIZE)
   const [filter, setFilter] = useState<QuestionFilter>({})
   const [dialog, setDialog] = useState<DialogState>({ type: 'closed' })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [conflictOpen, setConflictOpen] = useState(false)
   const [conflictQuestionId, setConflictQuestionId] = useState<number | null>(null)
+  const [reactivatingId, setReactivatingId] = useState<number | null>(null)
 
-  const { data, isLoading, isError, error, refetch } = useQuestions(page, size, filter)
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuestions(page, size, filter)
   const createMutation = useCreateQuestion()
   const updateMutation = useUpdateQuestion()
   const deactivateMutation = useDeactivateQuestion()
+  // Mutation riêng để trạng thái pending của form không bị lẫn với thao tác trên bảng.
+  const reactivateMutation = useUpdateQuestion()
 
-  const hasActiveFilters =
-    !!filter.keyword ||
-    filter.active !== undefined ||
-    (filter.techStackIds && filter.techStackIds.length > 0) ||
-    filter.unclassified !== undefined ||
-    (filter.technologyIds && filter.technologyIds.length > 0) ||
-    (filter.levels && filter.levels.length > 0) ||
-    (filter.questionTypes && filter.questionTypes.length > 0) ||
-    (filter.difficulties && filter.difficulties.length > 0)
+  const filtersApplied = hasActiveFilters(filter)
 
-  const handleFilterChange = useCallback((newFilter: QuestionFilter) => {
-    setFilter(newFilter)
+  const handleFilterChange = useCallback((next: QuestionFilter) => {
+    setFilter(next)
     setPage(0)
   }, [])
+
+  const handleClearFilters = useCallback(() => handleFilterChange({}), [handleFilterChange])
 
   function handleSizeChange(newSize: number) {
     setSize(newSize)
     setPage(0)
+  }
+
+  function openCreate() {
+    setFieldErrors({})
+    setDialog({ type: 'create' })
   }
 
   function handleEdit(question: Question) {
@@ -64,22 +82,19 @@ export default function QuestionListPage() {
     setDialog({ type: 'edit', questionId: question.id })
   }
 
-  function handleDeactivate(question: Question) {
-    setDialog({ type: 'delete', question })
-  }
-
+  /** Bản ghi dùng optimistic locking nên phải lấy version mới nhất trước khi PUT. */
   async function handleReactivate(question: Question) {
+    setReactivatingId(question.id)
     try {
-      // GET latest version first, then PUT with active=true
       const fresh = await getQuestion(question.id)
 
-      await updateMutation.mutateAsync({
+      await reactivateMutation.mutateAsync({
         id: question.id,
         payload: {
           contentVi: fresh.contentVi,
           contentEn: fresh.contentEn,
-          techStackIds: fresh.techStacks.map(t => t.id),
-          technologyIds: fresh.technologies.map(t => t.id),
+          techStackIds: fresh.techStacks.map((item) => item.id),
+          technologyIds: fresh.technologies.map((item) => item.id),
           level: fresh.level,
           questionType: fresh.questionType,
           difficulty: fresh.difficulty,
@@ -90,18 +105,18 @@ export default function QuestionListPage() {
       })
       toast.success('Đã kích hoạt lại câu hỏi.')
     } catch (err) {
-      const apiErr = normalizeError(err)
-      if (apiErr.code === 'QUESTION_VERSION_CONFLICT') {
-        toast.error('Câu hỏi đã được cập nhật bởi người khác. Vui lòng thử lại.')
-      } else {
-        toast.error(apiErr.message)
-      }
+      const apiError = normalizeError(err)
+      toast.error(
+        apiError.code === 'QUESTION_VERSION_CONFLICT'
+          ? 'Câu hỏi đã được cập nhật bởi người khác. Vui lòng thử lại.'
+          : apiError.message,
+      )
+    } finally {
+      setReactivatingId(null)
     }
   }
 
-  function handleFormSubmit(
-    payload: CreateQuestionPayload | UpdateQuestionPayload,
-  ) {
+  function handleFormSubmit(payload: CreateQuestionPayload | UpdateQuestionPayload) {
     setFieldErrors({})
 
     if (dialog.type === 'create') {
@@ -111,32 +126,34 @@ export default function QuestionListPage() {
           setDialog({ type: 'closed' })
         },
         onError: (err) => {
-          const apiErr = normalizeError(err)
-          if (apiErr.fieldErrors) {
-            setFieldErrors(apiErr.fieldErrors)
-          } else {
-            toast.error(apiErr.message)
-          }
+          const apiError = normalizeError(err)
+          if (apiError.fieldErrors) setFieldErrors(apiError.fieldErrors)
+          else toast.error(apiError.message)
         },
       })
-    } else if (dialog.type === 'edit') {
-      const updatePayload = payload as unknown as UpdateQuestionPayload
+      return
+    }
+
+    if (dialog.type === 'edit') {
+      const questionId = dialog.questionId
       updateMutation.mutate(
-        { id: dialog.questionId, payload: updatePayload },
+        { id: questionId, payload: payload as UpdateQuestionPayload },
         {
           onSuccess: () => {
             toast.success('Cập nhật câu hỏi thành công!')
             setDialog({ type: 'closed' })
           },
           onError: (err) => {
-            const apiErr = normalizeError(err)
-            if (apiErr.code === 'QUESTION_VERSION_CONFLICT') {
-              setConflictQuestionId(dialog.questionId)
-              setConflictOpen(true)
-            } else if (apiErr.fieldErrors) {
-              setFieldErrors(apiErr.fieldErrors)
+            const apiError = normalizeError(err)
+            if (apiError.code === 'QUESTION_VERSION_CONFLICT') {
+              // Cache còn giữ version cũ, không xóa thì mở lại form vẫn xung đột.
+              queryClient.invalidateQueries({ queryKey: ['question', questionId] })
+              setConflictQuestionId(questionId)
+              setDialog({ type: 'closed' })
+            } else if (apiError.fieldErrors) {
+              setFieldErrors(apiError.fieldErrors)
             } else {
-              toast.error(apiErr.message)
+              toast.error(apiError.message)
             }
           },
         },
@@ -144,7 +161,7 @@ export default function QuestionListPage() {
     }
   }
 
-  async function handleConfirmDeactivate() {
+  function handleConfirmDeactivate() {
     if (dialog.type !== 'delete') return
 
     deactivateMutation.mutate(dialog.question.id, {
@@ -152,71 +169,79 @@ export default function QuestionListPage() {
         toast.success('Đã vô hiệu hóa câu hỏi.')
         setDialog({ type: 'closed' })
       },
-      onError: (err) => {
-        const apiErr = normalizeError(err)
-        toast.error(apiErr.message)
-      },
+      onError: (err) => toast.error(normalizeError(err).message),
     })
   }
 
   function handleConflictReload() {
-    setConflictOpen(false)
-    // Re-open edit dialog to refetch latest data
-    if (conflictQuestionId !== null) {
+    const questionId = conflictQuestionId
+    setConflictQuestionId(null)
+    if (questionId !== null) {
       setFieldErrors({})
-      setDialog({ type: 'edit', questionId: conflictQuestionId })
+      setDialog({ type: 'edit', questionId })
     }
   }
 
   return (
     <div className="space-y-6 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ngân hàng câu hỏi</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">Ngân hàng câu hỏi</h1>
           <p className="text-sm text-muted-foreground">
             Quản lý câu hỏi phỏng vấn cho hệ thống
           </p>
         </div>
-        <Button onClick={() => { setFieldErrors({}); setDialog({ type: 'create' }) }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm câu hỏi
-        </Button>
-      </div>
-
-      {/* Filter bar */}
-      <QuestionFilterBar filter={filter} onChange={handleFilterChange} />
-
-      {/* Error state */}
-      {isError && (
-        <div className="flex flex-col items-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
-          <AlertCircle className="h-10 w-10 text-destructive" />
-          <div>
-            <p className="font-medium text-destructive">Không tải được danh sách câu hỏi</p>
-            <p className="text-sm text-muted-foreground">
-              {isApiError(error) ? error.message : 'Đã có lỗi xảy ra.'}
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Thử lại
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={isFetching}
+            onClick={() => refetch()}
+            aria-label="Tải lại danh sách"
+          >
+            <RefreshCw data-icon="inline-start" className={isFetching ? 'animate-spin' : undefined} />
+            Tải lại
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus data-icon="inline-start" />
+            Thêm câu hỏi
           </Button>
         </div>
-      )}
+      </div>
 
-      {/* Table */}
-      {!isError && (
+      <QuestionFilterBar filter={filter} onChange={handleFilterChange} />
+
+      {isError ? (
+        <Empty className="rounded-lg border border-destructive/30 bg-destructive/5">
+          <EmptyHeader>
+            <EmptyMedia variant="icon" className="bg-destructive/10 text-destructive">
+              <ServerCrash />
+            </EmptyMedia>
+            <EmptyTitle>Không tải được danh sách câu hỏi</EmptyTitle>
+            <EmptyDescription>{normalizeError(error).message}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw data-icon="inline-start" />
+              Thử lại
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : (
         <>
           <QuestionTable
             questions={data?.content ?? []}
             isLoading={isLoading}
-            hasActiveFilters={hasActiveFilters}
+            hasActiveFilters={filtersApplied}
+            pendingId={reactivatingId}
+            skeletonRows={Math.min(size, 5)}
             onEdit={handleEdit}
-            onDeactivate={handleDeactivate}
+            onDeactivate={(question) => setDialog({ type: 'delete', question })}
             onReactivate={handleReactivate}
+            onClearFilters={handleClearFilters}
+            onCreate={openCreate}
           />
 
-          {data && (
+          {data && data.totalElements > 0 && (
             <QuestionPagination
               page={data.page}
               totalPages={data.totalPages}
@@ -231,7 +256,6 @@ export default function QuestionListPage() {
         </>
       )}
 
-      {/* Create/Edit Dialog */}
       <QuestionFormDialog
         mode={dialog.type === 'edit' ? 'edit' : 'create'}
         editId={dialog.type === 'edit' ? dialog.questionId : null}
@@ -242,7 +266,6 @@ export default function QuestionListPage() {
         onClose={() => setDialog({ type: 'closed' })}
       />
 
-      {/* Delete Dialog */}
       <QuestionDeleteDialog
         question={dialog.type === 'delete' ? dialog.question : null}
         open={dialog.type === 'delete'}
@@ -251,11 +274,10 @@ export default function QuestionListPage() {
         onCancel={() => setDialog({ type: 'closed' })}
       />
 
-      {/* Version Conflict Dialog */}
       <QuestionVersionConflictDialog
-        open={conflictOpen}
+        open={conflictQuestionId !== null}
         onReload={handleConflictReload}
-        onCancel={() => setConflictOpen(false)}
+        onCancel={() => setConflictQuestionId(null)}
       />
     </div>
   )
