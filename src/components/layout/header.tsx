@@ -53,7 +53,7 @@ export default function Header() {
               </NavLink>
             </li>
           ))}
-          {user?.role === ROLES.EVENT_ADMIN && (
+          {user?.role === ROLES.ADMIN && (
             <li>
               <NavLink
                 to={ROUTES.adminQuestions}

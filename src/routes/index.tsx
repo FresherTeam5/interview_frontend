@@ -26,7 +26,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Admin routes — cần quyền EVENT_ADMIN
+  // Admin routes — cần quyền ADMIN
   {
     element: <AdminGuard />,
     children: [

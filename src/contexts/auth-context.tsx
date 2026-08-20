@@ -1,83 +1,102 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { loginUser, logoutUser, registerUser } from '@/api/auth'
-import { tokenStorage } from '@/api/token-storage'
+import { getCurrentUser, loginUser, loginWithGoogle, logoutUser, registerUser } from '@/api/auth'
 import { AUTH_EXPIRED_EVENT } from '@/api/client'
+import { tokenStorage } from '@/api/token-storage'
 import { AuthContext } from '@/contexts/auth-context-def'
-import { STORAGE_KEYS } from '@/constants/storage-keys'
-import type { AuthUser, LoginRequest, RegisterRequest } from '@/types/auth'
-
-
-function loadStoredUser(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.user)
-    if (!raw) return null
-    return JSON.parse(raw) as AuthUser
-  } catch {
-    return null
-  }
-}
-
-function storeUser(user: AuthUser) {
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user))
-}
-
-function clearStoredUser() {
-  localStorage.removeItem(STORAGE_KEYS.user)
-}
+import type { AuthContextValue, AuthResponse, LoginRequest, RegisterRequest } from '@/types/auth'
+import type { CurrentUser } from '@/types/api'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    // khôi phục user từ localStorage nếu có token
-    const token = tokenStorage.getAccessToken()
-    if (!token) return null
-    return loadStoredUser()
-  })
+  const [user, setUser] = useState<CurrentUser | null>(null)
+  const [isInitializing, setIsInitializing] = useState(true)
 
-  // lắng nghe sự kiện auth:expired từ api client
+  useEffect(() => {
+    let cancelled = false
+
+    async function hydrateUser() {
+      if (!tokenStorage.getAccessToken()) {
+        if (!cancelled) setIsInitializing(false)
+        return
+      }
+
+      try {
+        const currentUser = await getCurrentUser()
+        if (!cancelled) setUser(currentUser)
+      } catch {
+        const hadAccessToken = Boolean(tokenStorage.getAccessToken())
+        tokenStorage.clear()
+        if (hadAccessToken) window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT))
+        if (!cancelled) setUser(null)
+      } finally {
+        if (!cancelled) setIsInitializing(false)
+      }
+    }
+
+    void hydrateUser()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     function handleExpired() {
       setUser(null)
-      clearStoredUser()
+      setIsInitializing(false)
     }
+
     window.addEventListener(AUTH_EXPIRED_EVENT, handleExpired)
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpired)
   }, [])
 
-  const login = useCallback(async (data: LoginRequest) => {
-    const res = await loginUser(data)
-    const authUser: AuthUser = { userId: res.userId, email: res.email, role: res.role }
-    setUser(authUser)
-    storeUser(authUser)
-    return res
+  const completeLogin = useCallback(async (response: AuthResponse): Promise<AuthResponse> => {
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+      return response
+    } catch (error) {
+      tokenStorage.clear()
+      setUser(null)
+      throw error
+    }
   }, [])
 
-  const register = useCallback(async (data: RegisterRequest) => {
-    const res = await registerUser(data)
-    const authUser: AuthUser = { userId: res.userId, email: res.email, role: res.role }
-    setUser(authUser)
-    storeUser(authUser)
-    return res
-  }, [])
+  const login = useCallback(
+    async (data: LoginRequest) => completeLogin(await loginUser(data)),
+    [completeLogin],
+  )
+
+  const register = useCallback(
+    async (data: RegisterRequest) => completeLogin(await registerUser(data)),
+    [completeLogin],
+  )
+
+  const loginWithGoogleAccount = useCallback(
+    async (idToken: string) => completeLogin(await loginWithGoogle(idToken)),
+    [completeLogin],
+  )
 
   const logout = useCallback(async () => {
     try {
       await logoutUser()
     } finally {
       setUser(null)
-      clearStoredUser()
+      tokenStorage.clear()
     }
   }, [])
 
-  const value = useMemo(
+  const value = useMemo<AuthContextValue>(
     () => ({
       user,
       isAuthenticated: user !== null,
+      isInitializing,
       login,
       register,
+      loginWithGoogle: loginWithGoogleAccount,
       logout,
     }),
-    [user, login, register, logout],
+    [user, isInitializing, login, register, loginWithGoogleAccount, logout],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

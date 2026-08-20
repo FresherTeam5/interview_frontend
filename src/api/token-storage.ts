@@ -10,5 +10,6 @@ export const tokenStorage = {
 
   clear() {
     localStorage.removeItem(STORAGE_KEYS.accessToken)
+    localStorage.removeItem(STORAGE_KEYS.user)
   },
 }

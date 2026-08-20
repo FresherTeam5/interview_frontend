@@ -26,6 +26,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Spinner } from "@/components/ui/spinner"
+import GoogleLoginButton from '@/components/google-login-button'
 import { ROUTES } from '@/constants/routes'
 
 export interface SignupFieldErrors {
@@ -41,6 +42,8 @@ interface SignupFormProps extends React.ComponentProps<typeof Card> {
   error?: string
   fieldErrors?: SignupFieldErrors
   onFieldChange?: (field: keyof SignupFieldErrors) => void
+  onGoogleLogin?: (credential: string) => void | Promise<void>
+  onGoogleError?: () => void
 }
 
 export function SignupForm({
@@ -49,6 +52,8 @@ export function SignupForm({
   error,
   fieldErrors = {},
   onFieldChange,
+  onGoogleLogin,
+  onGoogleError,
   ...props
 }: SignupFormProps) {
   const [showPassword, setShowPassword] = useState(false)
@@ -170,9 +175,12 @@ export function SignupForm({
             </Field>
             <FieldSeparator>Hoặc tiếp tục với</FieldSeparator>
             <Field>
-              <Button variant="outline" type="button" className="w-full">
-                Đăng ký với Google
-              </Button>
+              <GoogleLoginButton
+                label="Đăng ký với Google"
+                onCredential={(credential) => onGoogleLogin?.(credential)}
+                onError={onGoogleError}
+                disabled={isLoading}
+              />
               <FieldDescription className="text-center">
                 Đã có tài khoản?{' '}
                 <Link

@@ -15,7 +15,7 @@ import {
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const { register } = useAuth()
+  const { register, loginWithGoogle } = useAuth()
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -77,6 +77,26 @@ export default function RegisterPage() {
     }
   }
 
+  async function handleGoogleLogin(idToken: string) {
+    setError('')
+    setIsLoading(true)
+
+    try {
+      await loginWithGoogle(idToken)
+      toast.success('Đăng ký Google thành công!')
+      navigate(ROUTES.home, { replace: true })
+    } catch (err) {
+      if (isApiError(err)) setError(err.message)
+      else setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function handleGoogleError() {
+    setError('Không thể đăng ký với Google. Vui lòng thử lại.')
+  }
+
   return (
     <SignupForm
       onSubmitForm={handleSubmit}
@@ -84,6 +104,8 @@ export default function RegisterPage() {
       error={error}
       fieldErrors={fieldErrors}
       onFieldChange={handleFieldChange}
+      onGoogleLogin={handleGoogleLogin}
+      onGoogleError={handleGoogleError}
     />
   )
 }

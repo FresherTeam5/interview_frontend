@@ -10,7 +10,7 @@ import { validateEmail, validatePassword } from '@/lib/validation'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -64,6 +64,26 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGoogleLogin(idToken: string) {
+    setError('')
+    setIsLoading(true)
+
+    try {
+      await loginWithGoogle(idToken)
+      toast.success('Đăng nhập Google thành công!')
+      navigate(ROUTES.home, { replace: true })
+    } catch (err) {
+      if (isApiError(err)) setError(err.message)
+      else setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function handleGoogleError() {
+    setError('Không thể đăng nhập với Google. Vui lòng thử lại.')
+  }
+
   return (
     <LoginForm
       onSubmitForm={handleSubmit}
@@ -71,6 +91,8 @@ export default function LoginPage() {
       error={error}
       fieldErrors={fieldErrors}
       onFieldChange={handleFieldChange}
+      onGoogleLogin={handleGoogleLogin}
+      onGoogleError={handleGoogleError}
     />
   )
 }

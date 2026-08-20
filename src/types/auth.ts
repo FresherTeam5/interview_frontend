@@ -1,16 +1,13 @@
 import type { UserRole } from '@/constants/roles'
-
-export interface AuthUser {
-  userId: number
-  email: string
-  role: UserRole
-}
+import type { CurrentUser } from '@/types/api'
 
 export interface AuthContextValue {
-  user: AuthUser | null
+  user: CurrentUser | null
   isAuthenticated: boolean
+  isInitializing: boolean
   login: (data: LoginRequest) => Promise<AuthResponse>
   register: (data: RegisterRequest) => Promise<AuthResponse>
+  loginWithGoogle: (idToken: string) => Promise<AuthResponse>
   logout: () => Promise<void>
 }
 
